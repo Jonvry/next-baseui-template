@@ -232,14 +232,14 @@ Combines clsx and tailwind-merge for optimal className handling:
 cn("px-4 py-2", "px-6"); // Result: "px-6 py-2"
 ```
 
-#### `formatPrice()` - Currency Formatter
+#### `formatCurrency()` - Currency Formatter
 
 Locale-aware price formatting with optional decimal control:
 
 ```typescript
-formatPrice(1000); // "₱1,000.00" (default PHP)
-formatPrice(1000, "USD", "en-US"); // "$1,000.00"
-formatPrice(1000, "PHP", "en-PH", false); // "₱1,000" (no cents)
+formatCurrency(1000); // "₱1,000.00" (default PHP)
+formatCurrency(1000, "USD", "en-US"); // "$1,000.00"
+formatCurrency(1000, "PHP", "en-PH", false); // "₱1,000" (no cents)
 ```
 
 ### 7. Custom Hooks
