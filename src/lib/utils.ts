@@ -14,7 +14,7 @@ export function cn(...inputs: ClassValue[]) {
  * @param withCents - Whether to show cents/decimals (default: true)
  * @returns formatted price string
  */
-export function formatPrice(
+export function formatCurrency(
     value: string | number,
     currency: CurrencyCode = "PHP",
     locale: LocaleCode = "en-PH",
