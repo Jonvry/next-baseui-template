@@ -13,7 +13,7 @@ A modern Next.js 16 template with React 19, TypeScript, Tailwind CSS 4, and a co
 ### Styling & UI
 
 - **Tailwind CSS 4** - Utility-first CSS framework (latest PostCSS version)
-- **Base UI Components 1.0.0-beta.6** - Headless accessible React components
+- **Base UI Components 1.0.0-rc.0** - Headless accessible React components
 - **next-themes 0.4.6** - Dark mode support with system preference detection
 - **Lucide React 0.554.0** - Beautiful & consistent icon library
 - **class-variance-authority 0.7.1** - Type-safe component variants
