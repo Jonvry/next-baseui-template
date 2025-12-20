@@ -6,14 +6,14 @@ A modern Next.js 16 template with React 19, TypeScript, Tailwind CSS 4, and a co
 
 ### Core Framework
 
-- **Next.js 16.0.3** - React framework with App Router, React Compiler, and Typed Routes
-- **React 19.2.0** - Latest React with improved hooks and compiler optimizations
+- **Next.js 16.1.0** - React framework with App Router, React Compiler, and Typed Routes
+- **React 19.2.3** - Latest React with improved hooks and compiler optimizations
 - **TypeScript 5** - Type-safe development with strict mode enabled
 
 ### Styling & UI
 
 - **Tailwind CSS 4** - Utility-first CSS framework (latest PostCSS version)
-- **Base UI Components 1.0.0-rc.0** - Headless accessible React components
+- **Base UI Components 1.0.0** - Headless accessible React components
 - **next-themes 0.4.6** - Dark mode support with system preference detection
 - **Lucide React 0.554.0** - Beautiful & consistent icon library
 - **class-variance-authority 0.7.1** - Type-safe component variants

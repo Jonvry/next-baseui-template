@@ -733,7 +733,7 @@ This project uses **coss ui** components built on **Base UI**. When debugging UI
 
 **Source**: https://base-ui.com/react/overview/quick-start
 
-**Installation**: `npm i @base-ui-components/react` (tree-shakeable)
+**Installation**: `npm i @base-ui/react` (tree-shakeable)
 
 **Portal Setup** (for Dialog, Popover, etc.):
 
@@ -757,7 +757,7 @@ body {
 Base UI components are composable - assemble sub-components:
 
 ```typescript
-import { Popover } from "@base-ui-components/react/popover";
+import { Popover } from "@base-ui/react/popover";
 
 <Popover.Root>
   <Popover.Trigger>Open</Popover.Trigger>

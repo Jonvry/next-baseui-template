@@ -49,9 +49,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                     enableSystem
                     disableTransitionOnChange
                 >
-                    <ToastProvider>
-                        <div className="isolate">{children}</div>
-                    </ToastProvider>
+                    <div className="isolate">
+                        <ToastProvider>{children}</ToastProvider>
+                    </div>
                 </ThemeProvider>
             </body>
         </html>
