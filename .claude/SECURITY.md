@@ -158,6 +158,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
 ## 5. CSP Reference
 
+### Directive Overview
+
 | Directive         | Purpose                           | Recommended Value                   |
 | ----------------- | --------------------------------- | ----------------------------------- |
 | `default-src`     | Fallback for all other directives | `'self'`                            |
@@ -168,6 +170,54 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 | `connect-src`     | XHR, fetch, websockets            | `'self'` + API URLs                 |
 | `frame-ancestors` | Frame embedding control           | `'none'`                            |
 | `form-action`     | Allowed form targets              | `'self'`                            |
+
+### CSP Explained: What Resources Are Allowed
+
+**Content Security Policy** is an HTTP header that tells the browser what resources are allowed to load and execute on your webpage.
+
+Think of it as a **whitelist** for your website:
+
+- Which scripts can run?
+- Where can images load from?
+- Which stylesheets are allowed?
+- Where can the page make network requests to?
+
+### Example CSP Configuration
+
+```ts
+// csp.ts
+
+/**
+ * Allowing CDN Example (Common Setup)
+ *
+ * Content-Security-Policy:
+ *   default-src 'self';
+ *   script-src 'self' https://cdn.jsdelivr.net;
+ *   style-src 'self' https://fonts.googleapis.com;
+ *   font-src 'self' https://fonts.gstatic.com;
+ *   img-src 'self' data: https://i.imgur.com;
+ */
+
+// ✅ Scripts from your domain + jsDeliver CDN
+// ✅ Styles from your domain + Google Fonts
+// ✅ Fonts from Google Fonts CDN
+// ✅ Images from your domain + Imgur
+// ❌ Inline scripts BLOCKED
+// ❌ Any other external domain BLOCKED
+```
+
+### How CSP Protects Against XSS
+
+Even if an attacker injects `<script>` tags, the browser will **refuse to execute them** unless they match your CSP policy.
+
+```html
+<!-- Attacker injects this -->
+<script>
+    alert("XSS");
+</script>
+
+<!-- Browser blocks it because it's not from an allowed source -->
+```
 
 ---
 
@@ -203,13 +253,13 @@ Always validate user input server-side.
 
 import { z } from "zod";
 
-const ContactSchema = z.object({
+const contactSchema = z.object({
     email: z.string().email(),
     message: z.string().min(1).max(1000),
 });
 
 export async function submitContact(formData: FormData) {
-    const result = ContactSchema.safeParse({
+    const result = contactSchema.safeParse({
         email: formData.get("email"),
         message: formData.get("message"),
     });
@@ -226,18 +276,308 @@ export async function submitContact(formData: FormData) {
 
 ## 8. XSS Prevention
 
-### ❌ Avoid
+### Understanding XSS Defense Strategies
 
-```tsx
-<div dangerouslySetInnerHTML={{ __html: userContent }} />
-```
+XSS (Cross-Site Scripting) attacks inject malicious scripts into trusted websites. We use **two complementary approaches**:
 
-### ✔ If needed, sanitize
+1. **Sanitization** - Remove dangerous content from stored data (HTML/Markdown)
+2. **Escaping** - Encode data only at output to make it safe for specific contexts (DOM, SQL)
+
+---
+
+### Sanitization vs. Escaping
+
+#### Sanitization (for HTML/Markdown input)
+
+We modify the data to remove dangerous or unwanted content — typically when allowing user markup.
 
 ```ts
+// validation.ts
+import DOMPurify from "dompurify";
+import { marked } from "marked";
+
+// HTML sanitization
+const userInput = "<h1>Hello</h1><script>alert('XSS')</script>";
+const safeHTML = DOMPurify.sanitize(userInput);
+// => "<h1>Hello</h1>"
+
+// Markdown sanitization
+const markdown = "Hello **World** <script>alert(1)</script>";
+const html = marked.parse(markdown);
+const safe = DOMPurify.sanitize(html);
+```
+
+#### Escaping (output encoding)
+
+You don't modify stored data — you encode it **only at output** to make it safe in its target context (DOM, SQL).
+
+```ts
+// escaping.ts
+
+// Escaping HTML output
+function escapeHTML(str: string) {
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+const safeHTML = `<div>${escapeHTML(userInput)}</div>`;
+
+// Escaping SQL Query
+const stmt = db.prepare("SELECT * FROM users WHERE name = ?");
+stmt.bind(userInput);
+const user = stmt.get();
+```
+
+---
+
+### Defence Strategy for Stored XSS
+
+#### 1. Client-Side and/or Server-Side Validation
+
+Apply validation rules **before** storing user content:
+
+```ts
+// test.js
+function validateComment(text) {
+    // Length limit
+    if (text.length > 1000) throw new Error("Too long");
+
+    // Character whitelist (if possible, because for many apps this rule will be too restrictive)
+    if (!/^[a-zA-Z0-9\s.,!?-]+$/.test(text)) {
+        throw new Error("Invalid characters");
+    }
+
+    // At minimum, reject obvious HTML tags
+    if (/<script|<iframe|javascript:/i.test(text)) {
+        throw new Error("Invalid content");
+    }
+}
+```
+
+**⚠️ Character Whitelist Problem**
+
+1. Too restrictive for international users
+2. Users often NEED some formatting (bold, italic, links to sources, etc.)
+3. Regex can be exploited (ReDoS attack)
+
+**ReDoS (Regular Expression Denial of Service)**
+
+A ReDoS attack exploits the complexity of regex operations to cause a denial of service by making the regex engine take an excessive amount of time to process certain inputs.
+
+```js
+// test.js
+const regex = /(a|a)*c/;
+const input = "aaaaaaaaaaaaaaaaaaaaaa";
+
+console.log(regex.test(input)); // Takes a long time to process
+```
+
+---
+
+#### 2. Sanitization on Storage (If HTML or Markdown is needed)
+
+**For HTML/Markdown user-generated content**, sanitize **before** storing:
+
+```ts
+// test.ts
+import DOMPurify from "isomorphic-dompurify";
+
+async function createComment(text) {
+    // If you MUST allow some HTML (bold, italic, links)
+    const sanitized = DOMPurify.sanitize(text, {
+        ALLOWED_TAGS: ["b", "i", "em", "strong", "a"],
+        ALLOWED_ATTR: ["href"],
+        ALLOWED_URI_REGEXP: /^https:\/\//i, // Only https:// links
+    });
+
+    await db.comments.insert({ text: sanitized });
+}
+```
+
+**Alternatives to DOMPurify:**
+
+- `sanitize-html` (Node.js)
+- `xss` (lightweight)
+
+---
+
+**⚠️ When using `dangerouslySetInnerHTML`**
+
+When we use `dangerouslySetInnerHTML` we **MUST trust that sanitized HTML is actually sanitized**. If sanitization failed, we have XSS.
+
+```tsx
+// test.tsx
+function Comment({ html }) {
+    // CRITICAL: Only use if you're 100% sure the HTML is sanitized
+    return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
+```
+
+**Better approach: Use `textContent` instead of `innerHTML`**
+
+```tsx
+// test.tsx
+function Comment({ text }) {
+    // Even if text contains malicious script, it will be inserted as plain text
+    return <div>{text}</div>;
+}
+```
+
+This way, even a malicious script will be inserted as a **plain text node** instead of executable code.
+
+---
+
+### Why We Want to Store Original (Not-Sanitized) Data
+
+**Reasons to preserve original user input:**
+
+- You can't fix what you've destroyed
+- Context changes (what's safe today may need different handling tomorrow)
+- Security patches become easier (re-sanitize with updated rules)
+- Better interoperability (different outputs may need different sanitization)
+- Preserve user intent (don't lose formatting or content)
+
+**Best practice:**
+
+```ts
+// Store BOTH original and sanitized versions
+await db.comments.insert({
+    text_original: userInput, // Original, unsanitized
+    text_sanitized: DOMPurify.sanitize(userInput), // Safe for display
+});
+```
+
+---
+
+### CSP (Content Security Policy)
+
+**Content Security Policy** is an HTTP header that tells the browser **what resources are allowed to load and execute** on your webpage.
+
+Think of it as a **whitelist for your website**:
+
+- Which scripts can run?
+- Where can images load from?
+- Which stylesheets are allowed?
+- Where can the page make network requests to?
+
+```ts
+// csp.ts
+
+/**
+ * Allowing CDN Example (Common Setup)
+ *
+ * Content-Security-Policy:
+ *   default-src 'self';
+ *   script-src 'self' https://cdn.jsdelivr.net;
+ *   style-src 'self' https://fonts.googleapis.com;
+ *   font-src 'self' https://fonts.gstatic.com;
+ *   img-src 'self' https://i.imgur.com;
+ */
+
+// ✅ Scripts from your domain + jsDeliver CDN
+// ✅ Styles from your domain + Google Fonts
+// ✅ Fonts from Google Fonts CDN
+// ❌ Inline scripts BLOCKED
+// ❌ Any other external domain BLOCKED
+```
+
+**How it protects against XSS:**
+
+Even if an attacker injects `<script>` tags, the browser will refuse to execute them unless they match your CSP policy.
+
+---
+
+### Example: Complete XSS Protection Flow
+
+```tsx
+// app/comments/actions.ts
+"use server";
+
+import DOMPurify from "isomorphic-dompurify";
+import { z } from "zod";
+
+const commentSchema = z.object({
+    text: z.string().min(1).max(1000),
+});
+
+export async function submitComment(formData: FormData) {
+    // 1. Validate length and format
+    const result = commentSchema.safeParse({
+        text: formData.get("text"),
+    });
+
+    if (!result.success) {
+        return { error: "Invalid input" };
+    }
+
+    // 2. Sanitize if HTML is needed
+    const sanitized = DOMPurify.sanitize(result.data.text, {
+        ALLOWED_TAGS: ["b", "i", "em", "strong", "a"],
+        ALLOWED_ATTR: ["href"],
+        ALLOWED_URI_REGEXP: /^https:\/\//i,
+    });
+
+    // 3. Store both original and sanitized versions
+    await db.comments.insert({
+        text_original: result.data.text,
+        text_sanitized: sanitized,
+    });
+
+    return { success: true };
+}
+```
+
+```tsx
+// app/comments/page.tsx
+export default function CommentsPage({ comments }) {
+    return (
+        <div>
+            {comments.map((comment) => (
+                <div key={comment.id}>
+                    {/* Safe: React escapes automatically */}
+                    {comment.text_sanitized}
+                </div>
+            ))}
+        </div>
+    );
+}
+```
+
+---
+
+### ❌ Never Do This
+
+```tsx
+// DANGER: Unsanitized user content
+<div dangerouslySetInnerHTML={{ __html: userContent }} />;
+
+// DANGER: Direct string interpolation in HTML
+element.innerHTML = userInput;
+
+// DANGER: Inline event handlers with user data
+<div onClick={`eval(${userInput})`} />;
+```
+
+---
+
+### ✅ Safe Practices
+
+```tsx
+// SAFE: Sanitize before rendering HTML
 import DOMPurify from "dompurify";
 
+// SAFE: React auto-escapes text
+<div>{userContent}</div>;
+
+// SAFE: Use textContent, not innerHTML
+element.textContent = userInput;
+
 const safe = DOMPurify.sanitize(userContent);
+<div dangerouslySetInnerHTML={{ __html: safe }} />;
 ```
 
 ---
